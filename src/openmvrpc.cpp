@@ -938,7 +938,7 @@ bool rpc_spi##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
     (void) timeout; \
 \
     digitalWrite(__cs_pin, LOW); \
-    delayMicroseconds(100); /* Give slave time to get ready */ \
+    delayMicroseconds(200); /* Give slave time to get ready */ \
     port.beginTransaction(__settings); \
     port.transfer(data, size); \
     port.endTransaction(); \
