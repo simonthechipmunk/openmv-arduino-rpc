@@ -783,8 +783,6 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
 \
     (void) timeout; \
     bool ok = true; \
-    port.begin(); \
-    port.setClock(__rate); \
 \
     for (size_t i = 0; i < size; i += 32) { \
         size_t size_remaining = size - i; \
@@ -795,7 +793,6 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
         if ((port.write(data + i, request_size) != request_size) || port.endTransmission(request_stop)) { ok = false; break; } \
     } \
 \
-    port.end(); \
     return ok; \
 }
 
@@ -811,8 +808,6 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
 { \
     (void) timeout; \
     bool ok = true; \
-    port.begin(); \
-    port.setClock(__rate); \
 \
     for (size_t i = 0; i < size; i += 32) { \
         size_t size_remaining = size - i; \
