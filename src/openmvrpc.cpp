@@ -813,8 +813,9 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
         size_t size_remaining = size - i; \
         uint8_t request_size = min(size_remaining, 32); \
         uint8_t request_stop = size_remaining <= 32; \
-        delayMicroseconds(100); \
         if (port.requestFrom(__slave_addr, request_size, request_stop) != request_size) { ok = false; break; } \
+        delayMicroseconds(100); \
+        if (!port.available()) { ok = false; break; } \
         for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
     } \
 \
