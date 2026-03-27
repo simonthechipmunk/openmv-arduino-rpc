@@ -828,8 +828,6 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
 \
     (void) timeout; \
     bool ok = true; \
-    port.begin(); \
-    port.setClock(__rate); \
 \
     for (size_t i = 0; i < size; i += 32) { \
         size_t size_remaining = size - i; \
