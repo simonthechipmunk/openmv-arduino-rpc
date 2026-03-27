@@ -763,8 +763,6 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
 { \
     (void) timeout; \
     bool ok = true; \
-    port.begin(); \
-    port.setClock(__rate); \
 \
     for (size_t i = 0; i < size; i += 32) { \
         size_t size_remaining = size - i; \
@@ -775,7 +773,6 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
         for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
     } \
 \
-    port.end(); \
     if (ok) ok = ok && (!_same(buff, size)); \
     if (!ok) delay(_get_short_timeout); \
     return ok; \
