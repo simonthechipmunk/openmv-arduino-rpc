@@ -335,6 +335,7 @@ private: \
     uint8_t __slave_addr; \
     static volatile uint8_t *__bytes_buff; \
     static volatile int __bytes_size; \
+    static volatile bool __bytes_out_ready; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
@@ -362,6 +363,7 @@ private: \
     uint32_t __rate; \
     static volatile uint8_t *__bytes_buff; \
     static volatile int __bytes_size; \
+    static volatile bool __bytes_out_ready; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
