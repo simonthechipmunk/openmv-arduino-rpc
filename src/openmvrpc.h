@@ -6,6 +6,7 @@
 
 #ifndef __OPENMVRPC__
 #define __OPENMVRPC__
+#define ARDUINO_ARCH_ESP32 //TODO temp
 
 #include <Arduino.h>
 #if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_NRF52840) && !defined(ARDUINO_ARCH_MBED)
@@ -336,6 +337,7 @@ private: \
     static volatile uint8_t *__bytes_buff; \
     static volatile int __bytes_size; \
     static volatile bool __bytes_out_ready; \
+    static volatile bool __bytes_in_ready; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
@@ -364,6 +366,7 @@ private: \
     static volatile uint8_t *__bytes_buff; \
     static volatile int __bytes_size; \
     static volatile bool __bytes_out_ready; \
+    static volatile bool __bytes_in_ready; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \

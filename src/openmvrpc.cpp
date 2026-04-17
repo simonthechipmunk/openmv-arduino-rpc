@@ -463,13 +463,17 @@ bool rpc_slave::__get_command(uint32_t *command, uint8_t **data, size_t *size, u
         _set_packet(__out_command_header_ack, _COMMAND_HEADER_PACKET_MAGIC, NULL, 0); // set repeatedly because SPI.transfer() clears.
         _zero(__in_command_header_buf, sizeof(__in_command_header_buf));
         _flush();
+        Serial.println("check A");
         if (_get_packet(_COMMAND_HEADER_PACKET_MAGIC, __in_command_header_buf, sizeof(__in_command_header_buf), _get_short_timeout)) {
+            Serial.println("check B");
             uint32_t cmd = unpack_unsigned_long(__in_command_header_buf + 2);
             uint32_t in_command_data_buf_len = unpack_unsigned_long(__in_command_header_buf + 6) + 4;
             if (__buff_len < in_command_data_buf_len) return false;
+            Serial.println("check C");
             put_bytes(__out_command_header_ack, sizeof(__out_command_header_ack), _put_short_timeout);
             if (_get_packet(_COMMAND_DATA_PACKET_MAGIC, __buff, in_command_data_buf_len, _get_long_timeout)) {
-               put_bytes(__out_command_data_ack, sizeof(__out_command_data_ack), _put_short_timeout);
+               Serial.println("check D");
+                put_bytes(__out_command_data_ack, sizeof(__out_command_data_ack), _put_short_timeout);
                *command = cmd;
                *data = __buff + 2;
                *size = in_command_data_buf_len - 4;
@@ -480,9 +484,6 @@ bool rpc_slave::__get_command(uint32_t *command, uint8_t **data, size_t *size, u
         // Avoid timeout livelocking.
         _put_short_timeout = min(_put_short_timeout + 1, timeout);
         _get_short_timeout = min(_get_short_timeout + 1, timeout);
-
-        // Yield to RTOS tasker to enable interrupts
-        delay(1);
     }
 
     return false;
@@ -787,6 +788,7 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
     for (int i = 0; i < size; i++) {Serial.print(buff[i], HEX); Serial.print(" ");}\
     Serial.print("rqst: "); \
     Serial.println(ok); \
+    return ok; \
 } \
 \
 bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long timeout) \
@@ -817,7 +819,7 @@ void rpc_i2c##name##_master::_flush() \
 \
 bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long timeout) \
 { \
-    bool ok = true; \
+    bool ok = false; \
     delayMicroseconds(500); \
 \
     unsigned long start = millis(); \
@@ -826,16 +828,20 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
             size_t size_remaining = size - i; \
             uint8_t request_size = min(size_remaining, 32); \
             uint8_t request_stop = size_remaining <= 32; \
-            if (port.requestFrom(__slave_addr, request_size, request_stop) != request_size) { ok = false; break; } \
+            if (port.requestFrom(__slave_addr, request_size, request_stop) != request_size) {break; } \
             delayMicroseconds(100); \
-            if (!port.available()) { ok = false; break; } \
             for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
+            ok = request_stop; \
         } \
-    } \
-    _flush(); \
 \
-    if (ok) ok = ok && (!_same(buff, size)); \
-    if (!ok) delay(_get_short_timeout); \
+        ok = ok && (!_same(buff, size)); \
+        if (!ok) delay(_get_short_timeout); \
+        _flush(); \
+    } \
+\
+    for (int i = 0; i < size; i++) {Serial.print(buff[i], HEX); Serial.print(" ");}\
+    Serial.print("rqst: "); \
+    Serial.println(ok); \
     return ok; \
 } \
 \
@@ -871,6 +877,7 @@ RPC_I2C_MASTER_IMPLEMENTATION(1,Wire1)
 volatile uint8_t *rpc_i2c##name##_slave::__bytes_buff = NULL; \
 volatile int rpc_i2c##name##_slave::__bytes_size = 0; \
 volatile bool rpc_i2c##name##_slave::__bytes_out_ready = false; \
+volatile bool rpc_i2c##name##_slave::__bytes_in_ready = false; \
 \
 void rpc_i2c##name##_slave::onReceiveHandler(int numBytes) \
 { \
@@ -880,8 +887,9 @@ void rpc_i2c##name##_slave::onReceiveHandler(int numBytes) \
     if (__bytes_buff == NULL || __bytes_size < numBytes) return; \
     for (int i = 0, j = min(__bytes_size, numBytes); i < j; i++) {__bytes_buff[i] = port.read(); Serial.print(__bytes_buff[i], HEX); Serial.print(" ");}\
     __bytes_buff += numBytes; \
-    __bytes_size += numBytes; \
-    Serial.println(); \
+    __bytes_size -= numBytes; \
+    __bytes_in_ready = true; \
+    Serial.print(" size: "); \
     Serial.println(__bytes_size); \
 } \
 \
@@ -890,7 +898,7 @@ void rpc_i2c##name##_slave::onRequestHandler() \
     Serial.print("rqst("); \
     Serial.print(__bytes_size); \
     Serial.print(", "); \
-    if (__bytes_buff == NULL || !__bytes_out_ready || !__bytes_size) return; \
+    if (__bytes_buff == NULL || !__bytes_out_ready || !__bytes_size){Serial.println("ABORT)"); return;} \
     size_t written = port.write((uint8_t *) __bytes_buff, min(__bytes_size, 32)); \
     Serial.print(written); \
     Serial.print("): "); \
@@ -910,8 +918,13 @@ bool rpc_i2c##name##_slave::get_bytes(uint8_t *buff, size_t size, unsigned long 
     __bytes_buff = buff; \
     __bytes_size = size; \
     unsigned long start = millis(); \
-    while (((millis() - start) <= timeout) && __bytes_size < size); \
-    bool ok = __bytes_size == size; \
+    while (((millis() - start) <= timeout) && !__bytes_in_ready && __bytes_size) {Serial.print("wait"); delay(1);} \
+    bool ok = !__bytes_size; \
+    Serial.println(__bytes_in_ready); \
+    for (int i = 0, j = size; i < j; i++) {Serial.print(buff[i], HEX); Serial.print(" ");}\
+    Serial.println(); \
+    if (ok) __bytes_in_ready = false; \
+    Serial.println(ok); \
     return ok; \
 } \
 \
@@ -921,10 +934,10 @@ bool rpc_i2c##name##_slave::put_bytes(uint8_t *data, size_t size, unsigned long 
     __bytes_size = size; \
     __bytes_out_ready = true; \
     unsigned long start = millis(); \
-    while (((millis() - start) <= timeout) && __bytes_size); \
+    while (((millis() - start) <= timeout) && __bytes_size) delay(1); \
     bool ok = !__bytes_size; \
     __bytes_size = 0; \
-    __bytes_out_ready = false; \
+    __bytes_out_ready = !ok; \
     return ok; \
 }
 
