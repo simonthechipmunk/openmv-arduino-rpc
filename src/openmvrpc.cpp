@@ -461,6 +461,7 @@ bool rpc_slave::__get_command(uint32_t *command, uint8_t **data, size_t *size, u
 
     while ((millis() - start) < timeout) {
         _set_packet(__out_command_header_ack, _COMMAND_HEADER_PACKET_MAGIC, NULL, 0); // set repeatedly because SPI.transfer() clears.
+        Serial.println("check 0A");
         _zero(__in_command_header_buf, sizeof(__in_command_header_buf));
         _flush();
         Serial.println("check A");
@@ -820,28 +821,32 @@ void rpc_i2c##name##_master::_flush() \
 bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long timeout) \
 { \
     bool ok = false; \
-    delayMicroseconds(500); \
+    delayMicroseconds(800); \
 \
     unsigned long start = millis(); \
-    while (((millis() - start) <= timeout) && !ok) { \
+    while (((millis() - start) <= 1000) && !ok) { \
         for (size_t i = 0; i < size; i += 32) { \
             size_t size_remaining = size - i; \
             uint8_t request_size = min(size_remaining, 32); \
             uint8_t request_stop = size_remaining <= 32; \
-            if (port.requestFrom(__slave_addr, request_size, request_stop) != request_size) {break; } \
+            port.flush(); \
+            if (port.requestFrom(__slave_addr, request_size, request_stop) != request_size) {Serial.println("error");break;} \
             delayMicroseconds(100); \
-            for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
-            ok = request_stop; \
+            if(port.available()){ \
+                for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
+                for (size_t j = 0; j < request_size; j++) {Serial.print(buff[i+j], HEX); Serial.print(" ");} \
+                if (i == 0 && _same(buff, request_size)) {Serial.print(request_size); Serial.println("not ready"); ok = false; break;} \
+                ok = request_stop; \
+            } \
+            else {Serial.println("not available"); ok = false; break;} \
         } \
 \
-        ok = ok && (!_same(buff, size)); \
-        if (!ok) delay(_get_short_timeout); \
-        _flush(); \
+        if (!ok) {_flush();Serial.println("flush"); delay(_get_short_timeout); } \
     } \
 \
-    for (int i = 0; i < size; i++) {Serial.print(buff[i], HEX); Serial.print(" ");}\
     Serial.print("rqst: "); \
     Serial.println(ok); \
+    _flush(); \
     return ok; \
 } \
 \
@@ -850,14 +855,16 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
 \
     (void) timeout; \
     bool ok = true; \
+    delay(100); /* Give slave time to get ready */ \
 \
     for (size_t i = 0; i < size; i += 32) { \
         size_t size_remaining = size - i; \
         uint8_t request_size = min(size_remaining, 32); \
-        uint8_t request_stop = size_remaining <= 32; \
-        delayMicroseconds(100); \
+        bool request_stop = size_remaining <= 32; \
         port.beginTransmission(__slave_addr); \
         if ((port.write(data + i, request_size) != request_size) || port.endTransmission(request_stop)) { ok = false; break; } \
+        Serial.print("snd: "); \
+        Serial.println(request_size); \
     } \
 \
     return ok; \
@@ -881,31 +888,45 @@ volatile bool rpc_i2c##name##_slave::__bytes_in_ready = false; \
 \
 void rpc_i2c##name##_slave::onReceiveHandler(int numBytes) \
 { \
+    if (__bytes_buff == NULL || __bytes_size < numBytes) { \
+        for (int i = 0; i < numBytes; i++) if(port.available()) port.read(); \
+        Serial.println("rcv ABORT"); \
+        return; \
+    } \
     Serial.print("rcv("); \
     Serial.print(numBytes); \
     Serial.print("): "); \
-    if (__bytes_buff == NULL || __bytes_size < numBytes) return; \
     for (int i = 0, j = min(__bytes_size, numBytes); i < j; i++) {__bytes_buff[i] = port.read(); Serial.print(__bytes_buff[i], HEX); Serial.print(" ");}\
     __bytes_buff += numBytes; \
     __bytes_size -= numBytes; \
-    __bytes_in_ready = true; \
+    __bytes_in_ready = !__bytes_size; \
     Serial.print(" size: "); \
     Serial.println(__bytes_size); \
 } \
 \
 void rpc_i2c##name##_slave::onRequestHandler() \
 { \
-    Serial.print("rqst("); \
-    Serial.print(__bytes_size); \
-    Serial.print(", "); \
-    if (__bytes_buff == NULL || !__bytes_out_ready || !__bytes_size){Serial.println("ABORT)"); return;} \
-    size_t written = port.write((uint8_t *) __bytes_buff, min(__bytes_size, 32)); \
-    Serial.print(written); \
-    Serial.print("): "); \
-    for (int i = 0; i < written; i++) {Serial.print(__bytes_buff[i], HEX); Serial.print(" ");}\
+    if (__bytes_buff == NULL || !__bytes_out_ready || !__bytes_size){ \
+        static const uint8_t zero[32] = {0}; \
+        port.slaveWrite((uint8_t *) zero, 32); \
+        Serial.print("rqst("); \
+        Serial.print(__bytes_size); \
+        Serial.print(", "); \
+        Serial.print("not ready)"); \
+    } \
+    else { \
+        size_t written = port.slaveWrite((uint8_t *) __bytes_buff, min(__bytes_size, 32)); \
+        Serial.print("rqst("); \
+        Serial.print(__bytes_size); \
+        Serial.print(", "); \
+        Serial.print(written); \
+        Serial.print("): "); \
+        for (int i = 0; i < written; i++) {Serial.print(__bytes_buff[i], HEX); Serial.print(" ");} \
+        __bytes_buff += written; \
+        __bytes_size -= written; \
+        if (!__bytes_size) __bytes_out_ready = false; \
+    } \
     Serial.println(); \
-    __bytes_buff += written; \
-    __bytes_size -= written; \
 } \
 \
 void rpc_i2c##name##_slave::_flush() \
@@ -917,14 +938,17 @@ bool rpc_i2c##name##_slave::get_bytes(uint8_t *buff, size_t size, unsigned long 
 { \
     __bytes_buff = buff; \
     __bytes_size = size; \
+    Serial.print("get("); \
     unsigned long start = millis(); \
-    while (((millis() - start) <= timeout) && !__bytes_in_ready && __bytes_size) {Serial.print("wait"); delay(1);} \
+    while (((millis() - start) <= 1000) && !__bytes_in_ready && __bytes_size) delay(1); \
     bool ok = !__bytes_size; \
     Serial.println(__bytes_in_ready); \
+    Serial.println(__bytes_size); \
     for (int i = 0, j = size; i < j; i++) {Serial.print(buff[i], HEX); Serial.print(" ");}\
     Serial.println(); \
-    if (ok) __bytes_in_ready = false; \
+    __bytes_in_ready = false; \
     Serial.println(ok); \
+    delay(1); \
     return ok; \
 } \
 \
@@ -933,11 +957,14 @@ bool rpc_i2c##name##_slave::put_bytes(uint8_t *data, size_t size, unsigned long 
     __bytes_buff = data; \
     __bytes_size = size; \
     __bytes_out_ready = true; \
+    Serial.print("snd("); \
+    Serial.print(__bytes_size); \
+    Serial.print(", "); \
     unsigned long start = millis(); \
-    while (((millis() - start) <= timeout) && __bytes_size) delay(1); \
+    while (((millis() - start) <= 1000) && __bytes_size) delay(1); \
+    Serial.println(__bytes_size); \
     bool ok = !__bytes_size; \
     __bytes_size = 0; \
-    __bytes_out_ready = !ok; \
     return ok; \
 }
 
