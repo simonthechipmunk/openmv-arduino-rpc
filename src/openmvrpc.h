@@ -356,15 +356,19 @@ public: \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
     virtual void begin() override { port.begin(__slave_addr, __sda_pin, __scl_pin, __rate); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
-protected: \
+    enum state {HEADER_REQ, HEADER_RCV, HEADER_ACK, DATA_REQ, DATA_ACK}; \
+    protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
     uint8_t __slave_addr; \
     int __sda_pin; \
     int __scl_pin; \
     uint32_t __rate; \
-    static volatile uint8_t *__bytes_buff; \
-    static volatile int __bytes_size; \
+    static volatile uint8_t *__bytes_in_buff; \
+    static volatile int __bytes_in_size; \
+    static volatile uint8_t *__bytes_out_buff; \
+    static volatile int __bytes_out_size; \
+    static volatile rpc_i2c##name##_slave::state __state; \
     static volatile bool __bytes_out_ready; \
     static volatile bool __bytes_in_ready; \
     static void onReceiveHandler(int numBytes); \
