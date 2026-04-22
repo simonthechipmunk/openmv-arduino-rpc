@@ -6,7 +6,6 @@
 
 #ifndef __OPENMVRPC__
 #define __OPENMVRPC__
-#define ARDUINO_ARCH_ESP32 //TODO temp
 
 #include <Arduino.h>
 #if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_NRF52840) && !defined(ARDUINO_ARCH_MBED)
@@ -325,7 +324,6 @@ class rpc_i2c##name##_slave : public rpc_slave \
 public: \
     rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __slave_addr(slave_addr) {} \
     ~rpc_i2c##name##_slave() {} \
-    virtual void _flush() override; \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
     virtual void begin() override { port.begin(__slave_addr); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
@@ -334,10 +332,11 @@ protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
     uint8_t __slave_addr; \
-    static volatile uint8_t *__bytes_buff; \
-    static volatile int __bytes_size; \
-    static volatile bool __bytes_out_ready; \
-    static volatile bool __bytes_in_ready; \
+    static volatile uint8_t *__bytes_in_buff; \
+    static volatile int __bytes_in_size; \
+    static volatile uint8_t *__bytes_out_buff; \
+    static volatile int __bytes_out_size; \
+    static volatile rpc_i2c##name##_slave::state __state; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
@@ -352,7 +351,6 @@ public: \
     rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __sda_pin(-1), __scl_pin(-1), __rate(0UL), __slave_addr(slave_addr) {} \
     rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate) {} \
     ~rpc_i2c##name##_slave() {} \
-    virtual void _flush() override; \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
     virtual void begin() override { port.begin(__slave_addr, __sda_pin, __scl_pin, __rate); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
@@ -369,8 +367,6 @@ private: \
     static volatile uint8_t *__bytes_out_buff; \
     static volatile int __bytes_out_size; \
     static volatile rpc_i2c##name##_slave::state __state; \
-    static volatile bool __bytes_out_ready; \
-    static volatile bool __bytes_in_ready; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
