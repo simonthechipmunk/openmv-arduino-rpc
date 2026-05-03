@@ -328,6 +328,8 @@ public: \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
     virtual void begin() override { port.begin(__slave_addr); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
     virtual void end() override { port.end(); } \
+    enum state {HEADER_REQ, HEADER_RCV, HEADER_ACK, DATA_REQ, DATA_ACK}; \
+
 protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
@@ -354,7 +356,8 @@ public: \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
     virtual void begin() override { port.begin(__slave_addr, __sda_pin, __scl_pin, __rate); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
-    enum state {HEADER_REQ, HEADER_RCV, HEADER_ACK, DATA_REQ, DATA_ACK}; \
+    virtual void end() override { port.end(); } \
+    enum state {HEADER_REQ, HEADER_RCV, HEADER_OK, HEADER_ACK, DATA_REQ, DATA_RCV, DATA_ACK}; \
     protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \

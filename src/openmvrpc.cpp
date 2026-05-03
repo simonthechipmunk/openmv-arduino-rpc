@@ -464,12 +464,16 @@ bool rpc_slave::__get_command(uint32_t *command, uint8_t **data, size_t *size, u
         _zero(__in_command_header_buf, sizeof(__in_command_header_buf));
         _flush();
         if (_get_packet(_COMMAND_HEADER_PACKET_MAGIC, __in_command_header_buf, sizeof(__in_command_header_buf), _get_short_timeout)) {
+            Serial.println("GETCOMMAND A");
             uint32_t cmd = unpack_unsigned_long(__in_command_header_buf + 2);
             uint32_t in_command_data_buf_len = unpack_unsigned_long(__in_command_header_buf + 6) + 4;
             if (__buff_len < in_command_data_buf_len) return false;
-            put_bytes(__out_command_header_ack, sizeof(__out_command_header_ack), _put_short_timeout);
+            if (!put_bytes(__out_command_header_ack, sizeof(__out_command_header_ack), _put_short_timeout)) continue;
+            Serial.println("GETCOMMAND B");
             if (_get_packet(_COMMAND_DATA_PACKET_MAGIC, __buff, in_command_data_buf_len, _get_long_timeout)) {
-                put_bytes(__out_command_data_ack, sizeof(__out_command_data_ack), _put_short_timeout);
+                Serial.println("GETCOMMAND C");
+                if (!put_bytes(__out_command_data_ack, sizeof(__out_command_data_ack), _put_short_timeout)) continue;
+                Serial.println("GETCOMMAND D");
                *command = cmd;
                *data = __buff + 2;
                *size = in_command_data_buf_len - 4;
@@ -500,10 +504,15 @@ bool rpc_slave::__put_result(uint8_t *data, size_t size, unsigned long timeout)
         _zero(__in_response_header_buf, sizeof(__in_response_header_buf));
         _zero(__in_response_data_buf, sizeof(__in_response_data_buf));
         _flush();
+        Serial.println("PUTRESULT A");
         if (_get_packet(_RESULT_HEADER_PACKET_MAGIC, __in_response_header_buf, sizeof(__in_response_header_buf), _get_short_timeout)) {
-            put_bytes(out_header, sizeof(out_header), _put_short_timeout);
+            Serial.println("PUTRESULT B");
+            if (!put_bytes(out_header, sizeof(out_header), _put_short_timeout)) continue;
+            Serial.println("PUTRESULT C");
             if (_get_packet(_RESULT_DATA_PACKET_MAGIC, __in_response_data_buf, sizeof(__in_response_data_buf), _get_short_timeout)) {
-                put_bytes(__buff, size + 4, _put_long_timeout);
+                Serial.println("PUTRESULT D");
+                if (!put_bytes(__buff, size + 4, _put_long_timeout)) continue;
+                Serial.println("PUTRESULT E");
                 return true;
             }
         }
@@ -833,6 +842,9 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
             else {break;} \
         } \
 \
+        /*Serial.print("DRIVER RX:");*/ \
+        /*for(int i = 0; i< 4; i++) {Serial.print(" "); Serial.print(buff[i], HEX);}*/\
+        /*Serial.println();*/\
         if (!ok) {_flush(); delayMicroseconds(100);} \
     } \
 \
@@ -852,7 +864,7 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
         uint8_t request_size = min(size_remaining, 32); \
         bool request_stop = size_remaining <= 32; \
         port.beginTransmission(__slave_addr); \
-        if ((port.write(data + i, request_size) != request_size) || port.endTransmission(request_stop)) { ok = false; break; } \
+        if ((port.write(data + i, request_size) != request_size) || port.endTransmission(true)) {ok = false; break;} \
     } \
 \
     return ok; \
@@ -894,7 +906,7 @@ void rpc_i2c##name##_slave::onRequestHandler() \
         written = port.write((uint8_t *) __bytes_out_buff, min(__bytes_out_size, 32)); \
         __bytes_out_buff += written; \
         __bytes_out_size -= written; \
-        if (!__bytes_out_size && __state == state::HEADER_ACK) __state = state::DATA_REQ; \
+        /*if (!__bytes_out_size && __state == state::HEADER_ACK) __state = state::DATA_REQ;*/ \
     } \
     for (size_t i = written; i < 32; i++) {port.write(0x0);} /* always write 32 bytes and fill with 0*/ \
 } \
@@ -903,30 +915,37 @@ bool rpc_i2c##name##_slave::get_bytes(uint8_t *buff, size_t size, unsigned long 
 { \
     __bytes_in_buff = buff; \
     __bytes_in_size = size; \
-    bool ok = false; \
+    bool result = false; \
+    Serial.print("state: "); \
+    Serial.println(__state);\
 \
-    if (__state == state::HEADER_RCV){ \
+    if(!(__state == state::HEADER_REQ || __state == state::HEADER_OK || __state == state::DATA_REQ)) {__state = state::HEADER_REQ; return result;} /*Sequence has been reset through MD5 mismatch in __get_packet*/ \
+\
+    if (__state == state::HEADER_OK){ \
         __state = state::HEADER_ACK; \
-        if(put_bytes(NULL, 0, 0)){ /*mark bytes ready for master to read after we are able to receive again*/\
+        if (put_bytes(NULL, 0, 0)){ /*mark bytes ready for master to read after we are able to receive again*/\
             __state = state::DATA_REQ; \
         } \
         else { \
             __state = state::HEADER_REQ; \
+            return result; \
         } \
     } \
     if (__state == state::HEADER_REQ || __state == state::DATA_REQ){ \
         unsigned long start = millis(); \
-        while (((millis() - start) <= timeout * 10) && __bytes_in_size) delayMicroseconds(100); \
+        while (((millis() - start) <= min(timeout * 10, _get_long_timeout)) && __bytes_in_size) delayMicroseconds(100); \
         if (!__bytes_in_size) { \
-            ok = true; \
+            result = true; \
             if (__state == state::HEADER_REQ) __state = state::HEADER_RCV; \
-            if (__state == state::DATA_REQ) __state = state::DATA_ACK; \
+            if (__state == state::DATA_REQ) __state = state::DATA_RCV; \
         } \
         else { \
+            Serial.print("bytes: "); \
+            Serial.println(__bytes_in_size); \
             __state = state::HEADER_REQ; \
         } \
     } \
-    return ok; \
+    return result; \
 } \
 \
 bool rpc_i2c##name##_slave::put_bytes(uint8_t *data, size_t size, unsigned long timeout) \
@@ -936,13 +955,15 @@ bool rpc_i2c##name##_slave::put_bytes(uint8_t *data, size_t size, unsigned long 
         __bytes_out_buff = data; \
         __bytes_out_size = size; \
         timeout_set = timeout; \
+        if (__state == HEADER_RCV) __state = state::HEADER_OK; /* MD5 sum has been marked ok by __get_packet*/ \
+        if (__state == DATA_RCV) __state = state::DATA_ACK; /*MD5 OK, skip DATA_OK since no more __get_packet follows*/\
     } \
-    bool ok = false; \
+    bool result = false; \
     if (__bytes_out_buff != NULL && (__state == state::HEADER_ACK || __state == state::DATA_ACK)) { \
         unsigned long start = millis(); \
         while (((millis() - start) <= timeout_set) && __bytes_out_size) delayMicroseconds(100); \
         if (!__bytes_out_size) { \
-            ok = true; \
+            result = true; \
             if (__state == state::DATA_ACK) __state = state::HEADER_REQ; \
         } \
         else { \
@@ -950,9 +971,9 @@ bool rpc_i2c##name##_slave::put_bytes(uint8_t *data, size_t size, unsigned long 
         } \
     } \
     else { \
-        ok = true; \
+        result = true; \
     } \
-    return ok; \
+    return result; \
 }
 
 RPC_I2C_SLAVE_IMPLEMENTATION(,Wire)
