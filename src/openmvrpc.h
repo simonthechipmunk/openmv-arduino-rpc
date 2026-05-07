@@ -8,7 +8,7 @@
 #define __OPENMVRPC__
 
 #include <Arduino.h>
-#if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_NRF52840) && !defined(ARDUINO_ARCH_MBED)
+#if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_NRF52840) && !defined(ARDUINO_ARCH_MBED) && !defined(OPENMVRPC_NO_CAN)
 #include <CAN.h>
 #endif
 #ifdef ARDUINO_ARCH_AVR
@@ -217,7 +217,7 @@ private:
     bool __register_callback(uint32_t hash, rpc_callback_type_t type, void *value);
 };
 
-#if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_NRF52840) && !defined(ARDUINO_ARCH_MBED)
+#if !defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ARCH_NRF52840) && !defined(ARDUINO_ARCH_MBED) && !defined(OPENMVRPC_NO_CAN)
 class rpc_can_master : public rpc_master
 {
 public:
