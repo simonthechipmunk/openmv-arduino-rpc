@@ -768,9 +768,9 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
     while (((millis() - start) <= timeout) && !ok) { \
         for (size_t i = 0; i < size; i += 32) { \
             size_t size_remaining = size - i; \
-            uint8_t request_size = min(size_remaining, 32); \
-            uint8_t request_stop = size_remaining <= 32; \
-            if (port.requestFrom(__slave_addr, 32, request_stop) != 32) {break;} \
+            size_t request_size = min(size_remaining, 32); \
+            bool request_stop = size_remaining <= 32; \
+            if (port.requestFrom(__slave_addr, (size_t)32, request_stop) != 32) {break;} \
             if(port.available()){ \
                 for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
                 if (i == 0 && _same(buff, request_size)) {break;} \
@@ -822,9 +822,9 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
     while (((millis() - start) <= timeout) && !ok) { \
         for (size_t i = 0; i < size; i += 32) { \
             size_t size_remaining = size - i; \
-            uint8_t request_size = min(size_remaining, 32); \
-            uint8_t request_stop = size_remaining <= 32; \
-            if (port.requestFrom(__slave_addr, 32, request_stop) != 32) {break;} \
+            size_t request_size = min(size_remaining, 32); \
+            bool request_stop = size_remaining <= 32; \
+            if (port.requestFrom(__slave_addr, (size_t)32, request_stop) != 32) {break;} \
             if(port.available()){ \
                 for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
                 if (i == 0 && _same(buff, request_size)) {break;} \
