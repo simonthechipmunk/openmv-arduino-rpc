@@ -852,7 +852,7 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
         uint8_t request_size = min(size_remaining, 32); \
         bool request_stop = size_remaining <= 32; \
         port.beginTransmission(__slave_addr); \
-        if ((port.write(data + i, request_size) != request_size) || port.endTransmission(true)) {ok = false; break;} \
+        if ((port.write(data + i, request_size) != request_size) || port.endTransmission(true)) { ok = false; break; } /*endTransmission without stop parameter does not work on ESP32*/\
     } \
 \
     return ok; \
