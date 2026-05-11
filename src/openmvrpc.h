@@ -343,13 +343,13 @@ protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
     uint8_t __slave_addr; \
-    static volatile uint8_t *__bytes_in_buff; \
-    static volatile int __bytes_in_size; \
-    static volatile uint8_t *__bytes_out_buff; \
-    static volatile int __bytes_out_size; \
-    static volatile rpc_i2c##name##_slave::state __state; \
-    static void onReceiveHandler(int numBytes); \
-    static void onRequestHandler(); \
+    volatile uint8_t *__bytes_in_buff; \
+    volatile int __bytes_in_size; \
+    volatile uint8_t *__bytes_out_buff; \
+    volatile int __bytes_out_size; \
+    volatile rpc_i2c##name##_slave::state __state; \
+    void onReceiveHandler(int numBytes); \
+    void onRequestHandler(); \
     TwoWire *__port; \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
 };
@@ -375,13 +375,13 @@ private: \
     int __sda_pin; \
     int __scl_pin; \
     uint32_t __rate; \
-    static volatile uint8_t *__bytes_in_buff; \
-    static volatile int __bytes_in_size; \
-    static volatile uint8_t *__bytes_out_buff; \
-    static volatile int __bytes_out_size; \
-    static volatile rpc_i2c##name##_slave::state __state; \
-    static void onReceiveHandler(int numBytes); \
-    static void onRequestHandler(); \
+    volatile uint8_t *__bytes_in_buff; \
+    volatile int __bytes_in_size; \
+    volatile uint8_t *__bytes_out_buff; \
+    volatile int __bytes_out_size; \
+    volatile rpc_i2c##name##_slave::state __state; \
+    void onReceiveHandler(int numBytes); \
+    void onRequestHandler(); \
     TwoWire *__port; \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
 };

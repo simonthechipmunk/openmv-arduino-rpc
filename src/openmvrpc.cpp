@@ -823,7 +823,7 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
         for (size_t i = 0; i < size; i += RPC_I2C_FRAME_SIZE) { \
             size_t size_remaining = size - i; \
             size_t request_size = min(size_remaining, RPC_I2C_FRAME_SIZE); \
-            bool request_stop = size_remaining <= RPC_I2C_FRAME_SIZE32; \
+            bool request_stop = size_remaining <= RPC_I2C_FRAME_SIZE; \
             if (__port->requestFrom(__slave_addr, (size_t)RPC_I2C_FRAME_SIZE, request_stop) != RPC_I2C_FRAME_SIZE) {break;} \
             if(__port->available()){ \
                 for (size_t j = 0; j < request_size; j++) buff[i+j] = __port->read(); \
