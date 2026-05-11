@@ -332,7 +332,7 @@ RPC_I2C_MASTER(3,Wire3)
 class rpc_i2c##name##_slave : public rpc_slave \
 { \
 public: \
-    rpc_i2c##name##_slave(uint8_t slave_addr=0x12, TwoWire *interface=&port) : rpc_slave(), __slave_addr(slave_addr), __port(interface) {} \
+    rpc_i2c##name##_slave(uint8_t slave_addr=0x12, TwoWire *interface=&port) : rpc_slave(), __slave_addr(slave_addr), __port(interface) { _this = this; } \
     ~rpc_i2c##name##_slave() {} \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
@@ -342,15 +342,18 @@ public: \
 protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
+    inline static rpc_i2c##name##_slave *_this = nullptr; \
     uint8_t __slave_addr; \
-    volatile uint8_t *__bytes_in_buff; \
-    volatile int __bytes_in_size; \
-    volatile uint8_t *__bytes_out_buff; \
-    volatile int __bytes_out_size; \
-    volatile rpc_i2c##name##_slave::state __state; \
+    static volatile uint8_t *__bytes_in_buff; \
+    static volatile int __bytes_in_size; \
+    static volatile uint8_t *__bytes_out_buff; \
+    static volatile int __bytes_out_size; \
+    static volatile rpc_i2c##name##_slave::state __state; \
     void onReceiveHandler(int numBytes); \
+    static void onReceiveHandlerCallback(int numBytes) { _this->onReceiveHandler(numBytes); } \
     void onRequestHandler(); \
-    TwoWire *__port; \
+    static void onRequestHandlerCallback() { _this->onRequestHandler(); } \
+    TwoWire * __port; \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
 };
 
@@ -360,29 +363,32 @@ private: \
 class rpc_i2c##name##_slave : public rpc_slave \
 { \
 public: \
-    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __sda_pin(-1), __scl_pin(-1), __rate(0UL), __slave_addr(slave_addr), __port(&port) {} \
-    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface=&port) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
+    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __sda_pin(-1), __scl_pin(-1), __rate(0UL), __slave_addr(slave_addr), __port(&port) { _this = this; } \
+    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface=&port) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) { _this = this; } \
     ~rpc_i2c##name##_slave() {} \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
-    virtual void begin() override { __port->begin(__slave_addr, __sda_pin, __scl_pin, __rate); __port->onReceive(onReceiveHandler); __port->onRequest(onRequestHandler); } \
+    virtual void begin() override { __port->begin(__slave_addr, __sda_pin, __scl_pin, __rate); __port->onReceive(onReceiveHandlerCallback); __port->onRequest(onRequestHandlerCallback); } \
     virtual void end() override { __port->end(); } \
     enum state {HEADER_REQ, HEADER_RCV, HEADER_OK, HEADER_ACK, DATA_REQ, DATA_RCV, DATA_ACK}; \
     protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
+    inline static rpc_i2c##name##_slave *_this = nullptr; \
     uint8_t __slave_addr; \
     int __sda_pin; \
     int __scl_pin; \
     uint32_t __rate; \
-    volatile uint8_t *__bytes_in_buff; \
-    volatile int __bytes_in_size; \
-    volatile uint8_t *__bytes_out_buff; \
-    volatile int __bytes_out_size; \
-    volatile rpc_i2c##name##_slave::state __state; \
+    static volatile uint8_t *__bytes_in_buff; \
+    static volatile int __bytes_in_size; \
+    static volatile uint8_t *__bytes_out_buff; \
+    static volatile int __bytes_out_size; \
+    static volatile rpc_i2c##name##_slave::state __state; \
     void onReceiveHandler(int numBytes); \
+    static void onReceiveHandlerCallback(int numBytes) { _this->onReceiveHandler(numBytes); } \
     void onRequestHandler(); \
-    TwoWire *__port; \
+    static void onRequestHandlerCallback() { _this->onRequestHandler(); } \
+    TwoWire * __port; \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
 };
 
