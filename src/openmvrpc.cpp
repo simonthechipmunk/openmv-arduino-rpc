@@ -753,10 +753,10 @@ bool rpc_can_slave::put_bytes(uint8_t *data, size_t size, unsigned long timeout)
 
 #if (!defined(ARDUINO_ARCH_ESP32)) && (!defined(ARDUINO_ARCH_ESP8266))
 
-#define RPC_I2C_MASTER_IMPLEMENTATION(name, port) \
+#define RPC_I2C_MASTER_IMPLEMENTATION(name) \
 void rpc_i2c##name##_master::_flush() \
 { \
-    for (int i = port.available(); i > 0; i--) port.read(); \
+    for (int i = __port->available(); i > 0; i--) __port->read(); \
 } \
 \
 bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long timeout) \
@@ -766,13 +766,13 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
 \
     unsigned long start = millis(); \
     while (((millis() - start) <= timeout) && !ok) { \
-        for (size_t i = 0; i < size; i += 32) { \
+        for (size_t i = 0; i < size; i += RPC_I2C_FRAME_SIZE) { \
             size_t size_remaining = size - i; \
-            size_t request_size = min(size_remaining, 32); \
-            bool request_stop = size_remaining <= 32; \
-            if (port.requestFrom(__slave_addr, (size_t)32, request_stop) != 32) {break;} \
-            if(port.available()){ \
-                for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
+            size_t request_size = min(size_remaining, RPC_I2C_FRAME_SIZE); \
+            bool request_stop = size_remaining <= RPC_I2C_FRAME_SIZE; \
+            if (__port->requestFrom(__slave_addr, (size_t)RPC_I2C_FRAME_SIZE, request_stop) != RPC_I2C_FRAME_SIZE) {break;} \
+            if(__port->available()){ \
+                for (size_t j = 0; j < request_size; j++) buff[i+j] = __port->read(); \
                 if (i == 0 && _same(buff, request_size)) {break;} \
                 ok = request_stop; \
             } \
@@ -792,12 +792,12 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
     (void) timeout; \
     bool ok = true; \
 \
-    for (size_t i = 0; i < size; i += 32) { \
+    for (size_t i = 0; i < size; i += RPC_I2C_FRAME_SIZE) { \
         size_t size_remaining = size - i; \
-        uint8_t request_size = min(size_remaining, 32); \
-        bool request_stop = size_remaining <= 32; \
-        port.beginTransmission(__slave_addr); \
-        if ((port.write(data + i, request_size) != request_size) || port.endTransmission(request_stop)) { ok = false; break; } \
+        uint8_t request_size = min(size_remaining, RPC_I2C_FRAME_SIZE); \
+        bool request_stop = size_remaining <= RPC_I2C_FRAME_SIZE; \
+        __port->beginTransmission(__slave_addr); \
+        if ((__port->write(data + i, request_size) != request_size) || __port->endTransmission(request_stop)) { ok = false; break; } \
     } \
 \
     return ok; \
@@ -805,10 +805,10 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
 
 #else
 
-#define RPC_I2C_MASTER_IMPLEMENTATION(name, port) \
+#define RPC_I2C_MASTER_IMPLEMENTATION(name) \
 void rpc_i2c##name##_master::_flush() \
 { \
-    for (int i = port.available(); i > 0; i--) port.read(); \
+    for (int i = __port->available(); i > 0; i--) __port->read(); \
 } \
 \
 bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long timeout) \
@@ -820,13 +820,13 @@ bool rpc_i2c##name##_master::get_bytes(uint8_t *buff, size_t size, unsigned long
     unsigned long start = millis(); \
     if (!initial_request) timeout *= 3; /*Extend timeout if the first transmission was already successful*/\
     while (((millis() - start) <= timeout) && !ok) { \
-        for (size_t i = 0; i < size; i += 32) { \
+        for (size_t i = 0; i < size; i += RPC_I2C_FRAME_SIZE) { \
             size_t size_remaining = size - i; \
-            size_t request_size = min(size_remaining, 32); \
-            bool request_stop = size_remaining <= 32; \
-            if (port.requestFrom(__slave_addr, (size_t)32, request_stop) != 32) {break;} \
-            if(port.available()){ \
-                for (size_t j = 0; j < request_size; j++) buff[i+j] = port.read(); \
+            size_t request_size = min(size_remaining, RPC_I2C_FRAME_SIZE); \
+            bool request_stop = size_remaining <= RPC_I2C_FRAME_SIZE32; \
+            if (__port->requestFrom(__slave_addr, (size_t)RPC_I2C_FRAME_SIZE, request_stop) != RPC_I2C_FRAME_SIZE) {break;} \
+            if(__port->available()){ \
+                for (size_t j = 0; j < request_size; j++) buff[i+j] = __port->read(); \
                 if (i == 0 && _same(buff, request_size)) {break;} \
                 ok = request_stop; \
             } \
@@ -847,12 +847,12 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
     (void) timeout; \
     bool ok = true; \
 \
-    for (size_t i = 0; i < size; i += 32) { \
+    for (size_t i = 0; i < size; i += RPC_I2C_FRAME_SIZE) { \
         size_t size_remaining = size - i; \
-        uint8_t request_size = min(size_remaining, 32); \
-        bool request_stop = size_remaining <= 32; \
-        port.beginTransmission(__slave_addr); \
-        if ((port.write(data + i, request_size) != request_size) || port.endTransmission(true)) { ok = false; break; } /*endTransmission without stop parameter does not work on ESP32*/\
+        uint8_t request_size = min(size_remaining, RPC_I2C_FRAME_SIZE); \
+        bool request_stop = size_remaining <= RPC_I2C_FRAME_SIZE; \
+        __port->beginTransmission(__slave_addr); \
+        if ((__port->write(data + i, request_size) != request_size) || __port->endTransmission(true)) { ok = false; break; } /*endTransmission without stop parameter does not work on ESP32*/\
     } \
 \
     return ok; \
@@ -860,15 +860,15 @@ bool rpc_i2c##name##_master::put_bytes(uint8_t *data, size_t size, unsigned long
 
 #endif
 
-RPC_I2C_MASTER_IMPLEMENTATION(,Wire)
+RPC_I2C_MASTER_IMPLEMENTATION()
 
 #if WIRE_HOWMANY > 1
-RPC_I2C_MASTER_IMPLEMENTATION(1,Wire1)
+RPC_I2C_MASTER_IMPLEMENTATION(1)
 #endif
 
 #undef RPC_I2C_MASTER_IMPLEMENTATION
 
-#define RPC_I2C_SLAVE_IMPLEMENTATION(name, port) \
+#define RPC_I2C_SLAVE_IMPLEMENTATION(name) \
 volatile uint8_t *rpc_i2c##name##_slave::__bytes_in_buff = NULL; \
 volatile int rpc_i2c##name##_slave::__bytes_in_size = 0; \
 volatile uint8_t *rpc_i2c##name##_slave::__bytes_out_buff = NULL; \
@@ -880,22 +880,22 @@ void rpc_i2c##name##_slave::onReceiveHandler(int numBytes) \
     size_t read = 0; \
     if (__bytes_in_buff != NULL && __bytes_in_size >= numBytes) { \
         read = min(__bytes_in_size, numBytes); \
-        for (int i = 0, j = min(__bytes_in_size, numBytes); i < j; i++) {__bytes_in_buff[i] = port.read();}\
+        for (int i = 0, j = min(__bytes_in_size, numBytes); i < j; i++) {__bytes_in_buff[i] = __port->read();}\
         __bytes_in_buff += read; \
         __bytes_in_size -= read; \
     } \
-    if (read < numBytes) {for (int i = port.available(); i > 0; i--) {port.read(); }} \
+    if (read < numBytes) {for (int i = __port->available(); i > 0; i--) {__port->read(); }} \
 } \
 \
 void rpc_i2c##name##_slave::onRequestHandler() \
 { \
     size_t written = 0; \
     if (__bytes_out_buff != NULL && (__state == state::HEADER_ACK || __state == state::DATA_ACK)  && __bytes_out_size) { \
-        written = port.write((uint8_t *) __bytes_out_buff, min(__bytes_out_size, 32)); \
+        written = __port->write((uint8_t *) __bytes_out_buff, min(__bytes_out_size, RPC_I2C_FRAME_SIZE)); \
         __bytes_out_buff += written; \
         __bytes_out_size -= written; \
     } \
-    for (size_t i = written; i < 32; i++) {port.write(0x0);} /* always write 32 bytes and fill with 0*/ \
+    for (size_t i = written; i < RPC_I2C_FRAME_SIZE; i++) {__port->write(0x0);} /* always write RPC_I2C_FRAME_SIZE bytes and fill with 0*/ \
 } \
 \
 bool rpc_i2c##name##_slave::get_bytes(uint8_t *buff, size_t size, unsigned long timeout) \
@@ -959,18 +959,18 @@ bool rpc_i2c##name##_slave::put_bytes(uint8_t *data, size_t size, unsigned long 
     return result; \
 }
 
-RPC_I2C_SLAVE_IMPLEMENTATION(,Wire)
+RPC_I2C_SLAVE_IMPLEMENTATION()
 
 #if WIRE_HOWMANY > 1
-RPC_I2C_SLAVE_IMPLEMENTATION(1,Wire1)
+RPC_I2C_SLAVE_IMPLEMENTATION(1)
 #endif
 
 #if WIRE_HOWMANY > 2
-RPC_I2C_SLAVE_IMPLEMENTATION(2,Wire2)
+RPC_I2C_SLAVE_IMPLEMENTATION(2)
 #endif
 
 #if WIRE_HOWMANY > 3
-RPC_I2C_SLAVE_IMPLEMENTATION(3,Wire3)
+RPC_I2C_SLAVE_IMPLEMENTATION(3)
 #endif
 
 #undef RPC_I2C_SLAVE_IMPLEMENTATION

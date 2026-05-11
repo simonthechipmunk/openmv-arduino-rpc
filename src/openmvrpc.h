@@ -255,37 +255,48 @@ private:
 
 #if (!defined(ARDUINO_ARCH_ESP32)) && (!defined(ARDUINO_ARCH_ESP8266))
 
+#if (defined(ATTINYCORE) || defined(ARDUINO_SOFTWARE_I2C))
+#define RPC_I2C_FRAME_SIZE 16
+#else
+#define RPC_I2C_FRAME_SIZE 32
+#endif
+
 #define RPC_I2C_MASTER(name, port) \
 class rpc_i2c##name##_master : public rpc_master \
 { \
 public: \
-    rpc_i2c##name##_master(uint8_t slave_addr=0x12) : rpc_master(), __slave_addr(slave_addr) {} \    ~rpc_i2c##name##_master() {} \
+    rpc_i2c##name##_master(uint8_t slave_addr=0x12) : rpc_master(), __slave_addr(slave_addr), __port(&port) {} \
+    rpc_i2c##name##_master(uint8_t slave_addr=0x12, TwoWire *interface) : rpc_master(), __slave_addr(slave_addr), __port(interface) {} \
+    ~rpc_i2c##name##_master() {} \
     virtual void _flush() override; \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
-    virtual void begin() override { port.begin();} \
+    virtual void begin() override { __port->begin();} \
     void set_slave_addr(uint8_t slave_addr) { __slave_addr = slave_addr; } \
     uint8_t get_slave_addr() { return __slave_addr; } \
 protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
     uint8_t __slave_addr; \
+    TwoWire *__port; \
     rpc_i2c##name##_master(const rpc_i2c##name##_master &); \
 };
 
 #else
 
+#define RPC_I2C_FRAME_SIZE 32
 #define RPC_I2C_MASTER(name, port) \
 class rpc_i2c##name##_master : public rpc_master \
 { \
 public: \
-    rpc_i2c##name##_master(uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_master(), __sda_pin(-1), __scl_pin(-1), __slave_addr(slave_addr), __rate(rate) {} \
-    rpc_i2c##name##_master(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_master(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate) {} \
+    rpc_i2c##name##_master(uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_master(), __sda_pin(-1), __scl_pin(-1), __slave_addr(slave_addr), __rate(rate), __port(&port) {} \
+    rpc_i2c##name##_master(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_master(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(&port) {} \
+    rpc_i2c##name##_master(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface) : rpc_master(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
     ~rpc_i2c##name##_master() {} \
     virtual void _flush() override; \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
-    virtual void begin() override { port.begin(__sda_pin, __scl_pin, __rate);} \
+    virtual void begin() override { __port->begin(__sda_pin, __scl_pin, __rate);} \
     void set_slave_addr(uint8_t slave_addr) { __slave_addr = slave_addr; } \
     uint8_t get_slave_addr() { return __slave_addr; } \
 protected: \
@@ -295,6 +306,7 @@ private: \
     int __sda_pin; \
     int __scl_pin; \
     uint32_t __rate; \
+    TwoWire *__port; \
     rpc_i2c##name##_master(const rpc_i2c##name##_master &); \
 };
 
@@ -322,14 +334,14 @@ RPC_I2C_MASTER(3,Wire3)
 class rpc_i2c##name##_slave : public rpc_slave \
 { \
 public: \
-    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __slave_addr(slave_addr) {} \
+    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __slave_addr(slave_addr), __port(&port) {} \
+    rpc_i2c##name##_slave(uint8_t slave_addr=0x12, TwoWire *interface) : rpc_slave(), __slave_addr(slave_addr), __port(interface) {} \
     ~rpc_i2c##name##_slave() {} \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
-    virtual void begin() override { port.begin(__slave_addr); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
-    virtual void end() override { port.end(); } \
+    virtual void begin() override { __port->begin(__slave_addr); __port->onReceive(onReceiveHandler); __port->onRequest(onRequestHandler); } \
+    virtual void end() override { __port->end(); } \
     enum state {HEADER_REQ, HEADER_RCV, HEADER_ACK, DATA_REQ, DATA_ACK}; \
-
 protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
 private: \
@@ -341,6 +353,7 @@ private: \
     static volatile rpc_i2c##name##_slave::state __state; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
+    TwoWire *__port; \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
 };
 
@@ -350,13 +363,14 @@ private: \
 class rpc_i2c##name##_slave : public rpc_slave \
 { \
 public: \
-    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __sda_pin(-1), __scl_pin(-1), __rate(0UL), __slave_addr(slave_addr) {} \
-    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate) {} \
+    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __sda_pin(-1), __scl_pin(-1), __rate(0UL), __slave_addr(slave_addr), __port(&port) {} \
+    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(&port) {} \
+    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
     ~rpc_i2c##name##_slave() {} \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
-    virtual void begin() override { port.begin(__slave_addr, __sda_pin, __scl_pin, __rate); port.onReceive(onReceiveHandler); port.onRequest(onRequestHandler); } \
-    virtual void end() override { port.end(); } \
+    virtual void begin() override { __port->begin(__slave_addr, __sda_pin, __scl_pin, __rate); __port->onReceive(onReceiveHandler); __port->onRequest(onRequestHandler); } \
+    virtual void end() override { __port->end(); } \
     enum state {HEADER_REQ, HEADER_RCV, HEADER_OK, HEADER_ACK, DATA_REQ, DATA_RCV, DATA_ACK}; \
     protected: \
     virtual uint32_t _stream_writer_queue_depth_max() override { return 1; } \
@@ -372,6 +386,7 @@ private: \
     static volatile rpc_i2c##name##_slave::state __state; \
     static void onReceiveHandler(int numBytes); \
     static void onRequestHandler(); \
+    TwoWire *__port; \
     rpc_i2c##name##_slave(const rpc_i2c##name##_slave &); \
 };
 
