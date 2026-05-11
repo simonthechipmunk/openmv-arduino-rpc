@@ -265,8 +265,7 @@ private:
 class rpc_i2c##name##_master : public rpc_master \
 { \
 public: \
-    rpc_i2c##name##_master(uint8_t slave_addr=0x12) : rpc_master(), __slave_addr(slave_addr), __port(&port) {} \
-    rpc_i2c##name##_master(uint8_t slave_addr=0x12, TwoWire *interface) : rpc_master(), __slave_addr(slave_addr), __port(interface) {} \
+    rpc_i2c##name##_master(uint8_t slave_addr=0x12, TwoWire *interface=&port) : rpc_master(), __slave_addr(slave_addr), __port(interface) {} \
     ~rpc_i2c##name##_master() {} \
     virtual void _flush() override; \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
@@ -289,9 +288,8 @@ private: \
 class rpc_i2c##name##_master : public rpc_master \
 { \
 public: \
-    rpc_i2c##name##_master(uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_master(), __sda_pin(-1), __scl_pin(-1), __slave_addr(slave_addr), __rate(rate), __port(&port) {} \
     rpc_i2c##name##_master(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_master(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(&port) {} \
-    rpc_i2c##name##_master(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface) : rpc_master(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
+    rpc_i2c##name##_master(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface=&port) : rpc_master(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
     ~rpc_i2c##name##_master() {} \
     virtual void _flush() override; \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
@@ -334,8 +332,7 @@ RPC_I2C_MASTER(3,Wire3)
 class rpc_i2c##name##_slave : public rpc_slave \
 { \
 public: \
-    rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __slave_addr(slave_addr), __port(&port) {} \
-    rpc_i2c##name##_slave(uint8_t slave_addr=0x12, TwoWire *interface) : rpc_slave(), __slave_addr(slave_addr), __port(interface) {} \
+    rpc_i2c##name##_slave(uint8_t slave_addr=0x12, TwoWire *interface=&port) : rpc_slave(), __slave_addr(slave_addr), __port(interface) {} \
     ~rpc_i2c##name##_slave() {} \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
@@ -364,8 +361,7 @@ class rpc_i2c##name##_slave : public rpc_slave \
 { \
 public: \
     rpc_i2c##name##_slave(uint8_t slave_addr=0x12) : rpc_slave(), __sda_pin(-1), __scl_pin(-1), __rate(0UL), __slave_addr(slave_addr), __port(&port) {} \
-    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(&port) {} \
-    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
+    rpc_i2c##name##_slave(int sda, int scl, uint8_t slave_addr=0x12, uint32_t rate=0UL, TwoWire *interface=&port) : rpc_slave(), __sda_pin(sda), __scl_pin(scl), __slave_addr(slave_addr), __rate(rate), __port(interface) {} \
     ~rpc_i2c##name##_slave() {} \
     virtual bool get_bytes(uint8_t *buff, size_t size, unsigned long timeout) override; \
     virtual bool put_bytes(uint8_t *data, size_t size, unsigned long timeout) override; \
